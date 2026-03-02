@@ -1,0 +1,28 @@
+
+# Environment
+.env
+
+# Generated configs / runtime data
+etc/**
+data/**
+backups/**
+
+# Logs / temp
+*.log
+*.tmp
+*.swp
+*.swo
+*.bak
+
+# Python common
+__pycache__/
+*.pyc
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Compose artifacts
+*.pid

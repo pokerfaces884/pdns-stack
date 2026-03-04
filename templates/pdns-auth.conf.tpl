@@ -13,6 +13,8 @@ webserver-address=${PDNS_AUTH_WEB_BIND}
 webserver-port=${PDNS_AUTH_WEB_PORT}
 webserver-allow-from=${PDNS_AUTH_WEB_ACL}
 
+# authoritative only
 recursor=
 
+# DDNS廃止
 dnsupdate=no

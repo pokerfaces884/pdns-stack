@@ -2,7 +2,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(dirname "$0")/.."
-set -a; source ./.env; set +a
+
+set -a
+source ./.env
+set +a
 
 mkdir -p ./etc/dnsdist ./etc/pdns-auth ./etc/pdns-recursor
 mkdir -p ./data/pdns-auth ./data/pdns-admin ./backups
@@ -22,11 +25,17 @@ forward_zones:
   - "${RECURSOR_INTERNAL_ZONES}"
 EOF
   fi
+
   fwd=""
   [ -n "${RECURSOR_FORWARDERS_V4:-}" ] && fwd="${RECURSOR_FORWARDERS_V4}"
   if [ -n "${RECURSOR_FORWARDERS_V6:-}" ]; then
-    if [ -n "$fwd" ]; then fwd="$fwd;${RECURSOR_FORWARDERS_V6}"; else fwd="${RECURSOR_FORWARDERS_V6}"; fi
+    if [ -n "$fwd" ]; then
+      fwd="$fwd;${RECURSOR_FORWARDERS_V6}"
+    else
+      fwd="${RECURSOR_FORWARDERS_V6}"
+    fi
   fi
+
   if [ -n "$fwd" ]; then
     cat >> "$REC_YML" <<EOF
 

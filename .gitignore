@@ -14,15 +14,15 @@ backups/**
 *.swo
 *.bak
 
-# Python common
-__pycache__/
-*.pyc
-
-# Editors / OS
+# Editor / OS
 .vscode/
 .idea/
 .DS_Store
 Thumbs.db
 
-# Compose artifacts
-*.pid
+# Python
+__pycache__/
+*.pyc
+
+# Archives
+*.zip

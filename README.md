@@ -1,86 +1,69 @@
 
-# PowerDNS Stack (dnsdist + Authoritative + Recursor + Admin) — テンプレート
+# PowerDNS Stack（dnsdist + Authoritative + Recursor + Admin）— 完成版テンプレート
 
 PowerDNS Authoritative / Recursor / dnsdist / PowerDNS-Admin を Docker Compose で構築するテンプレートです。
 
-- **dnsdistレート制限**（静的: `MaxQPSIPRule` + `TCAction`/`DropAction`/`MaxQPSRule`、動的: `dynBlockRulesGroup`）
-- **上流フォワーダ**：IPv4 ×2、IPv6 ×2（`.=...` で全外部を転送）
-- **DDNS（動的更新）無効**
-- **DNSSEC対応**（CSKデフォルト。鍵ローテーションは `pdnsutil` / API を用いた半自動運用）
+- **dnsdist レート制限**（静的 + 動的）
+- **上流フォワーダ**：IPv4 ×2、IPv6 ×2（外部のみ forward）
+- **DDNS 廃止**
+- **DNSSEC 対応**（Online Signing / CSKデフォ）
+- **IPv6方針**：AAAA参照は許可、IPv6クライアントからのDNSアクセスは不許可（IPv4のみ待受）
 
-> 参考：
-> - dnsdist レート制限: https://www.dnsdist.org/advanced/qpslimits.html / https://www.dnsdist.org/rules-actions.html / https://www.dnsdist.org/guides/dynblocks.html
-> - Recursor フォワード構文: https://doc.powerdns.com/recursor/settings.html
-> - DNSSEC（pdnsutil / CSK）: https://doc.powerdns.com/authoritative/dnssec/ / https://doc.powerdns.com/authoritative/dnssec/pdnsutil.html
-
----
-
-## 動作要件
+## 1. 動作要件
 - Docker / Docker Compose v2
-- `envsubst`（`gettext` パッケージ）
+- `envsubst`（AlmaLinux: `sudo dnf -y install gettext`）
 
-## 取得
+## 2. セットアップ
+
 ```bash
-git clone https://github.com/<YOUR-ORG>/pdns-stack.git
-cd pdns-stack
+cp .env.example .env
+# .env を編集（ACL・上流フォワーダなど）
+chmod +x scripts/*.sh scripts/cron/*.sh
+./scripts/00-render-configs.sh
+./scripts/10-init-auth-sqlite.sh   # 初回のみ
+docker compose up -d
+./scripts/20-create-zones-and-dnssec.sh
 ```
 
-## 初期設定
-1. `.env` を作成
-   ```bash
-   cp .env.example .env
-   ```
-   - `DOMAIN` / `REVERSE_ZONE`
-   - `DNSDIST_ACL`（IPv4 のみ）
-   - `RECURSOR_ALLOW_FROM`（IPv4 のみ）
-   - `RECURSOR_FORWARDERS_V4` / `RECURSOR_FORWARDERS_V6`（各2系統）
+## 3. 動作確認
 
-2. 設定生成
-   ```bash
-   ./scripts/00-render-configs.sh
-   ```
-
-3. 初回のみ（Authoritative SQLite 初期化）
-   ```bash
-   ./scripts/10-init-auth-sqlite.sh
-   ```
-
-4. 起動
-   ```bash
-   docker compose up -d
-   ```
-
-5. ゾーン作成 + DNSSEC
-   ```bash
-   ./scripts/20-create-zones-and-dnssec.sh
-   ```
-
-## 動作確認
 ```bash
-# 権威ドメイン（IPv4クライアントから）
+# 権威（内部）
 dig @<dnsdist_ipv4> www.${DOMAIN} A +short
-dig @<dnsdist_ipv4> www.${DOMAIN} AAAA +short
-
-# 外部ドメイン（forward 動作）
-dig @<dnsdist_ipv4> www.google.com A +short
+# AAAA参照（IPv4クライアントから）
 dig @<dnsdist_ipv4> www.google.com AAAA +short
+# 外部 forward
+dig @<dnsdist_ipv4> www.google.com A +short
 ```
 
-## セキュリティ（IPv6クライアント不許可）
-- dnsdist は IPv4 のみで待受
-- Recursor も IPv6では待受しない
-- OS側でも IPv6:53/tcp+udp を DROP することを推奨
+## 4. DNSSEC（追加手順）
 
-## DNSSEC 鍵ローテーション（半自動の例）
+### 4.1 初回（ゾーン署名）
+
 ```bash
-# 新鍵追加＆有効化（CSK）
-docker exec -it pdns-auth pdnsutil add-zone-key ${DOMAIN} active ecdsa256
-# 猶予後に古い鍵無効化
-docker exec -it pdns-auth pdnsutil list-zone-keys ${DOMAIN}
-docker exec -it pdns-auth pdnsutil deactivate-zone-key ${DOMAIN} <OLD_KEY_ID>
-# 必要に応じて DS を更新
+docker exec -it pdns-auth pdnsutil zone secure ${DOMAIN}
+docker exec -it pdns-auth pdnsutil rectify-zone ${DOMAIN}
+```
+
+外部公開する場合は DS を取得してレジストラへ登録します：
+
+```bash
 docker exec -it pdns-auth pdnsutil export-zone-ds ${DOMAIN}
 ```
 
-## ライセンス
-MIT（必要に応じて置き換え）
+### 4.2 鍵ローテーション（cron 同梱）
+
+- スクリプト：`scripts/cron/` に同梱
+- 手順：`docs/CRON_DNSSEC.md` を参照
+
+---
+
+## 5. 重要: IPv6クライアント不許可
+- dnsdist/recursor は IPv4 のみで待受（IPv6で listen しない）
+- OSレベルでも IPv6:53 を DROP 推奨
+
+---
+
+## 6. 収録ファイル
+- `.gitignore`（推奨）
+- `REQUIREMENTS.md`（要件まとめ）
